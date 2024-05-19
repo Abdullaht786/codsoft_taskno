@@ -1,0 +1,64 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
+from xgboost import XGBClassifier
+
+# Load the Titanic dataset
+url = "C:\\Users\\md\\OneDrive\\Desktop\\Titanic-Dataset.csv"
+data = pd.read_csv(url)
+
+# Preprocess the data
+data = data.dropna()
+data['Sex'] = data['Sex'].map({'male': 0, 'female': 1})
+data['Embarked'] = data['Embarked'].map({'S': 0, 'C': 1, 'Q': 2})
+data['Age'] = data['Age'].fillna(data['Age'].mean())
+data['Fare'] = data['Fare'].fillna(data['Fare'].mean())
+data['Survived'] = data['Survived'].map({0: 0, 1: 1})
+
+# Split the dataset into training and testing sets
+X = data.drop('Survived', axis=1)
+y = data['Survived']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train the XGBoost model
+model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+model.fit(X_train, y_train)
+
+# Make predictions using the trained model and the testing data
+prediction = model.predict(X_test)
+
+# Evaluate the performance of the model using various metrics
+print("Accuracy:", accuracy_score(y_test, prediction))
+print("Precision:", precision_score(y_test, prediction))
+print("Recall:", recall_score(y_test, prediction))
+print("F1-score:", f1_score(y_test, prediction))
+
+# Visualize the performance of the model using ROC curve and Precision-Recall curve
+fpr, tpr, _ = roc_curve(y_test, prediction)
+roc_auc = auc(fpr, tpr)
+
+plt.figure()
+lw = 2
+plt.plot(fpr, tpr, color='darkorange', lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC)')
+plt.legend(loc="lower right")
+plt.show()
+
+# Precision-Recall Curve
+from sklearn.metrics import precision_recall_curve
+precision, recall, _ = precision_recall_curve(y_test, prediction)
+
+plt.figure()
+plt.plot(recall, precision, marker='.')
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title('Precision-Recall Curve')
+plt.show()
