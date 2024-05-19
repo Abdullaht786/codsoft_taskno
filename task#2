@@ -1,0 +1,55 @@
+import pandas as pd
+from lightfm import LightFM
+from lightfm.data import Dataset
+from sklearn.metrics import mean_squared_error
+
+# Read the dataset
+df = pd.read_csv('ml-latest-small.zip')
+
+# Split the data into train and test sets
+train_df = df.sample(frac=0.8, random_state=200)
+test_df = df.drop(train_df.index)
+
+# Get the unique user and movie ids
+user_ids = df.userId.unique().tolist()
+movie_ids = df.movieId.unique().tolist()
+
+# Map the user and movie ids to a range of integers starting from 0
+user_id_mapping = {user: i for i, user in enumerate(user_ids)}
+movie_id_mapping = {movie: i for i, movie in enumerate(movie_ids)}
+
+# Map the ratings data to the new integer ids
+train_df['userId'] = train_df['userId'].map(user_id_mapping)
+train_df['movieId'] = train_df['movieId'].map(movie_id_mapping)
+test_df['userId'] = test_df['userId'].map(user_id_mapping)
+test_df['movieId'] = test_df['movieId'].map(movie_id_mapping)
+
+# Prepare the interaction matrix for LightFM
+dataset = Dataset()
+dataset.fit(user_ids, movie_ids)
+(interactions, _) = dataset.build_interactions([(x['userId'], x['movieId'], x['rating']) for x in train_df.to_dict('records')])
+
+# Build the model
+model = LightFM(loss='warp')
+model.fit(interactions, epochs=30, num_threads=2)
+
+# Prepare the test data for predictions
+test_user_ids = test_df['userId'].values
+test_movie_ids = test_df['movieId'].values
+
+# Make predictions for the test set
+predictions = []
+for user, movie in zip(test_user_ids, test_movie_ids):
+    predictions.append(model.predict(user, movie))
+
+# Create a dataframe to store the predictions
+df_predictions = pd.DataFrame({'predicted_rating': predictions})
+df_predictions['userId'] = test_df['userId'].values
+df_predictions['movieId'] = test_df['movieId'].values
+
+# Calculate the root mean squared error of the predictions
+rmse = mean_squared_error(test_df['rating'], df_predictions['predicted_rating'], squared=False)
+print('Root Mean Squared Error:', rmse)
+
+# Save the predictions to a CSV file
+df_predictions.to_csv('Predicted Ratings.csv', index=False)
